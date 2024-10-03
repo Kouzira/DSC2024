@@ -25,7 +25,7 @@ class ImageFeatureExtractor(nn.Module):
         Shape: (Batch size, 65, 768)
         """
         
-        outputs = model(input)
+        outputs = self.efficient_net(input)
         last_hidden_states = outputs.last_hidden_state
 
         # (_, 2048, 15, 15) -> (_, 2048, 8, 8) 
