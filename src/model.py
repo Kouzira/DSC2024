@@ -4,7 +4,7 @@ from transformers import AutoImageProcessor, EfficientNetModel
 from typing import List, Optional, Tuple, Union
 
 
-class ImageFeatureExtractor(nn.Modulo):
+class ImageFeatureExtractor(nn.Module):
     r"""
     ImageFeatureExtractor uses efficientnet-b5 to extract features from images,
     then maps the features to fit the input size of phobert.
