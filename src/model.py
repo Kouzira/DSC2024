@@ -1,10 +1,11 @@
 import torch
 import torch.nn as nn
-from transformers import (AutoImageProcessor, 
-                          EfficientNetModel, 
-                          RobertaModel,
-                          AutoModel,
-                          AutoTokenizer)
+from transformers import (
+    AutoImageProcessor, 
+    EfficientNetModel, 
+    RobertaModel,
+    AutoModel
+)
 from transformers.modeling_outputs import BaseModelOutputWithPoolingAndCrossAttentions
 from typing import List, Optional, Tuple, Union
 
@@ -18,7 +19,6 @@ class ImageFeatureExtractor(nn.Module):
 
         self.efficient_net = EfficientNetModel.from_pretrained("google/efficientnet-b5")
         self.avg_pool2d = nn.AvgPool2d(2, ceil_mode=True)
-        # self.bridge_layer = nn.Linear(2048, 768)
 
     def forward(
         self,
@@ -40,7 +40,6 @@ class ImageFeatureExtractor(nn.Module):
         final_model_output = outputs.pooler_output.unsqueeze(1)
 
         feature = torch.cat((pooled_hidden_states, final_model_output), dim=1)
-        # feature = self.bridge_layer(feature)
 
         return feature
 
@@ -185,7 +184,7 @@ def custom_forward(
             cross_attentions=encoder_outputs.cross_attentions,
         )
 
-class ModifiedPhoBERT(nn.Moudule):
+class ModifiedPhoBERT(nn.Module):
     r"""
     This modified version takes input_ids and an optinal feature tensor.
     """
@@ -202,27 +201,61 @@ class ModifiedPhoBERT(nn.Moudule):
         return self.phobert(input_ids, additional_feature)
 
 
-class MultiModalPhoBERT(nn.Module):
+class MultiModalClassifier(nn.Module):
     r"""
     
     """
     def __init__(self):
         super().__init__()
-        # img_output_len = 65
-        # self.tokenizer_1_max_len = self.modified_phobert_1.config["max_position_embeddings"] - img_output_len
-        # self.tokenizer_2_max_len = self.modified_phobert_2.config["max_position_embeddings"] - 
-
         self.image_feature_extractor = ImageFeatureExtractor()
         self.image_processor = AutoImageProcessor.from_pretrained("google/efficientnet-b5")
-
-        #ocr
 
         self.bridge_layer_1 = nn.Linear(2048, 768)
 
         self.modified_phobert_1 = ModifiedPhoBERT()
-        self.tokenizer_1 = AutoTokenizer.from_pretrained("vinai/phobert-base-v2")
 
+        self.pool_1 = nn.AvgPool1d(4, 4)
         self.bridge_layer_2 = nn.Linear(768, 768)
 
         self.modified_phobert_2 = ModifiedPhoBERT()
-        self.tokenizer_2 = AutoTokenizer.from_pretrained("vinai/phobert-base-v2")
+
+        self.fc1 = nn.Linear(2 * 768, 256)
+        self.gelu = nn.GELU
+        self.dropout = nn.Dropout(0.5)
+        self.fc2 = nn.Linear(256, 4)
+        self.softmax = nn.Softmax(dim=1)
+
+    def forward(
+        self,
+        image,
+        ocr_text_ids,
+        desc_text_ids
+    ) -> torch.Tensor:
+        image_tensor = self.image_processor(image, return_tensors="pt")
+        image_feature = self.image_feature_extractor(image_tensor)
+        image_feature = self.bridge_layer_1(image_feature)
+
+        # phobert1
+        phobert_1_output = self.modified_phobert_1(ocr_text_ids, image_feature)
+        last_hidden_state_1 = phobert_1_output.last_hidden_state
+
+        # pad the feature tensor to fixed size of (_, 256, _)
+        padding_size = 256 - last_hidden_state_1.shape[1]
+        last_hidden_state_1 = nn.functional.pad(
+            last_hidden_state_1,
+            (0, padding_size, 0, 0)
+        )
+        # avg pool to size (_, 32, _)
+        phobert_1_feature = self.pool_1(last_hidden_state_1.permute(0, 2, 1)).permute(0, 2, 1)
+        phobert_1_feature = self.bridge_layer_2(phobert_1_feature)
+
+        # phobert2
+        phobert_2_output = self.modified_phobert_2(desc_text_ids, phobert_1_feature)
+
+        all_feature = torch.cat((phobert_1_output.pooler_output, phobert_2_output.pooler_output), dim=1)
+        x = self.fc1(all_feature)
+        x = self.gelu(x)
+        x = self.dropout(x)
+        x = self.fc2(x)
+        x = self.softmax(x)
+        return x
