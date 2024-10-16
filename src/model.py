@@ -47,7 +47,7 @@ class ImageFeatureExtractor(nn.Module):
 def custom_forward(
         self,
         text_input_ids: Optional[torch.Tensor] = None,
-        image_feature_input: Optional[torch.Tensor] = None,
+        additional_feature_input: Optional[torch.Tensor] = None,
         attention_mask: Optional[torch.Tensor] = None,
         token_type_ids: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.Tensor] = None,
@@ -109,7 +109,7 @@ def custom_forward(
         past_key_values_length = past_key_values[0][0].shape[2] if past_key_values is not None else 0
 
         if attention_mask is None:
-            attention_mask = torch.ones(((batch_size, seq_length + image_feature_input.size()[1] + past_key_values_length)), device=device)
+            attention_mask = torch.ones(((batch_size, seq_length + additional_feature_input.size()[1] + past_key_values_length)), device=device)
         
 #         print("att_mask:", attention_mask.shape)
         
@@ -153,9 +153,9 @@ def custom_forward(
             past_key_values_length=past_key_values_length,
         )
         
-        image_feature_input = self.embeddings.LayerNorm(image_feature_input)
-        image_feature_input = self.embeddings.dropout(image_feature_input)
-        embedding_output = torch.cat((embedding_output, image_feature_input), dim=1)
+        additional_feature_input = self.embeddings.LayerNorm(additional_feature_input)
+        additional_feature_input = self.embeddings.dropout(additional_feature_input)
+        embedding_output = torch.cat((additional_feature_input, embedding_output), dim=1)
         
         encoder_outputs = self.encoder(
             embedding_output,
@@ -220,18 +220,17 @@ class MultiModalClassifier(nn.Module):
         self.modified_phobert_2 = ModifiedPhoBERT()
 
         self.fc1 = nn.Linear(2 * 768, 256)
-        self.gelu = nn.GELU
+        self.gelu = nn.GELU()
         self.dropout = nn.Dropout(0.5)
         self.fc2 = nn.Linear(256, 4)
         self.softmax = nn.Softmax(dim=1)
 
     def forward(
         self,
-        image,
+        image_tensor,
         ocr_text_ids,
         desc_text_ids
     ) -> torch.Tensor:
-        image_tensor = self.image_processor(image, return_tensors="pt")
         image_feature = self.image_feature_extractor(image_tensor)
         image_feature = self.bridge_layer_1(image_feature)
 
@@ -239,13 +238,7 @@ class MultiModalClassifier(nn.Module):
         phobert_1_output = self.modified_phobert_1(ocr_text_ids, image_feature)
         last_hidden_state_1 = phobert_1_output.last_hidden_state
 
-        # pad the feature tensor to fixed size of (_, 256, _)
-        padding_size = 256 - last_hidden_state_1.shape[1]
-        last_hidden_state_1 = nn.functional.pad(
-            last_hidden_state_1,
-            (0, padding_size, 0, 0)
-        )
-        # avg pool to size (_, 32, _)
+        # avg pool to size (_, n/4, _)
         phobert_1_feature = self.pool_1(last_hidden_state_1.permute(0, 2, 1)).permute(0, 2, 1)
         phobert_1_feature = self.bridge_layer_2(phobert_1_feature)
 
