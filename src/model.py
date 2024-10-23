@@ -203,12 +203,12 @@ class ModifiedPhoBERT(nn.Module):
 
 class MultiModalClassifier(nn.Module):
     r"""
-    
+    ocr_text max tokens = 191
+    caption max tokens = 224
     """
     def __init__(self):
         super().__init__()
         self.image_feature_extractor = ImageFeatureExtractor()
-        self.image_processor = AutoImageProcessor.from_pretrained("google/efficientnet-b5")
 
         self.bridge_layer_1 = nn.Linear(2048, 768)
 
@@ -225,11 +225,26 @@ class MultiModalClassifier(nn.Module):
         self.fc2 = nn.Linear(256, 4)
         self.softmax = nn.Softmax(dim=1)
 
+        self.params = nn.ModuleDict({
+            'pretrained': nn.ModuleList(
+            [
+                self.image_feature_extractor, 
+                self.modified_phobert_1, 
+                self.modified_phobert_2
+            ]),
+            'untrained': nn.ModuleList(
+            [
+                self.bridge_layer_1, 
+                self.bridge_layer_2, 
+                self.fc1, 
+                self.fc2
+            ])})
+
     def forward(
         self,
         image_tensor,
         ocr_text_ids,
-        desc_text_ids
+        caption_text_ids
     ) -> torch.Tensor:
         image_feature = self.image_feature_extractor(image_tensor)
         image_feature = self.bridge_layer_1(image_feature)
@@ -243,7 +258,7 @@ class MultiModalClassifier(nn.Module):
         phobert_1_feature = self.bridge_layer_2(phobert_1_feature)
 
         # phobert2
-        phobert_2_output = self.modified_phobert_2(desc_text_ids, phobert_1_feature)
+        phobert_2_output = self.modified_phobert_2(caption_text_ids, phobert_1_feature)
 
         all_feature = torch.cat((phobert_1_output.pooler_output, phobert_2_output.pooler_output), dim=1)
         x = self.fc1(all_feature)
