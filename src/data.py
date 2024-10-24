@@ -38,6 +38,7 @@ def load_data():
 
     
     # Initialize image processor and tokenizer
+    # Initialize image processor and tokenizer
     image_processor = AutoImageProcessor.from_pretrained("google/efficientnet-b5")
     tokenizer = AutoTokenizer.from_pretrained("vinai/phobert-base-v2")
 
@@ -47,33 +48,29 @@ def load_data():
         image = Image.open(img_path)
         image_tensor = image_processor(image, return_tensors="pt")["pixel_values"]
         images_tensor.append(image_tensor)
-
-    # Stack the image tensors to create a single tensor
-    images_tensor = torch.cat(images_tensor)
+    images_tensor = torch.cat(images_tensor, dim=0)
 
     # Process OCR texts
     ocr_text_ids = []
     for ocr_text in ocr_texts:
-        input_ids = torch.tensor([tokenizer.encode(ocr_text, max_length=191, truncation=True)])
+        input_ids = tokenizer.encode(ocr_text, max_length=191, padding="max_length", truncation=True, return_tensors="pt")
         ocr_text_ids.append(input_ids)
-
-    ocr_text_ids = torch.cat(ocr_text_ids)
+    ocr_text_ids = torch.cat(ocr_text_ids, dim=0)
 
     # Process captions
     caption_ids = []
     for caption in captions:
-        input_ids = torch.tensor([tokenizer.encode(caption, max_length=224, truncation=True)])
+        input_ids = tokenizer.encode(caption, max_length=224, padding="max_length", truncation=True, return_tensors="pt")
         caption_ids.append(input_ids)
-
-    caption_ids = torch.cat(caption_ids)
+    caption_ids = torch.cat(caption_ids, dim=0)
 
     # Encode labels as numerical values
     label_map = {
         "multi-sarcasm": 0,
         "text-sarcasm": 1,
         "image-sarcasm": 2,
-        "non-sarcasm": 3
+        "not-sarcasm": 3
     }
     labels_tensor = torch.tensor([label_map[label] for label in labels])
-
+    
     return images_tensor, ocr_text_ids, caption_ids, labels_tensor
