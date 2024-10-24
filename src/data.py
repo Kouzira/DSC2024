@@ -45,7 +45,7 @@ def load_data(images_path, ocr_texts, captions, labels):
     # Process images
     images_tensor = []
     for img_path in images_path:
-        image = Image.open(img_path)
+        image = Image.open(img_path).convert('RGB')  # Ensure the image is in RGB format
         image_tensor = image_processor(image, return_tensors="pt")["pixel_values"]
         images_tensor.append(image_tensor)
     images_tensor = torch.cat(images_tensor, dim=0)
@@ -69,7 +69,7 @@ def load_data(images_path, ocr_texts, captions, labels):
         "multi-sarcasm": 0,
         "text-sarcasm": 1,
         "image-sarcasm": 2,
-        "not-sarcasm": 3
+        "non-sarcasm": 3
     }
     labels_tensor = torch.tensor([label_map[label] for label in labels])
     
