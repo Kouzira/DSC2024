@@ -16,7 +16,7 @@ class MultiMediaDataset(Dataset):
     def __getitem__(self, index):
         return self.images[index], self.ocr_text_ids[index], self.caption_ids[index], self.labels[index]
         
-def load_data():
+def load_data(images_path, ocr_texts, captions, labels):
     r'''
     return images, ocr_text_ids, caption_ids, labels
     in tensor type
