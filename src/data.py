@@ -2,19 +2,54 @@ from torch.utils.data import Dataset, DataLoader, Subset
 from transformers import AutoImageProcessor, AutoTokenizer
 import torch
 from PIL import Image
+import os
 
 class MultiMediaDataset(Dataset):
-    def __init__(self, images, ocr_text_ids, caption_ids, labels):
-        self.images = images
-        self.ocr_text = ocr_text_ids
-        self.caption_ids = caption_ids
-        self.labels = labels
+    def __init__(self, rootdir: str):
+        r"""
+        rootdir\
+        ....multi-sacarsm\
+        = = = = sample0\
+        = = = = sample1\
+        ....non-sacarsm\
+        = = = = samples\
+        ....image-sacarsm
+        """
+        self.image_paths = []
+        self.ocr_paths = []
+        self.caption_paths = []
+        self.labels = []
+        label_names = []
+
+        for class_name in os.listdir(rootdir):
+            class_path = os.path.join(rootdir, class_name)
+            if (not os.path.isdir(class_path)):
+                continue
+            
+            label = torch.nn.functional.one_hot(len(label_names))
+            for sample_id in os.listdir(class_path):
+                sample_path = os.path.join(class_path, sample_id)
+                if (not os.path.isdir(sample_path)):
+                    continue
+
+                self.image_paths.append(os.path.join(sample_path, f"{sample_id}_image.pt"))
+                self.ocr_paths.append(os.path.join(sample_path, f"{sample_id}_ocr.pt"))
+                self.caption_paths.append(os.path.join(sample_path, f"{sample_id}_caption.pt"))
+                self.labels.append(label)
+            label_names.append(class_name)
+
+    # def get_label_name(label):
+    #     return label_name[label]
     
     def __len__(self):
         return self.labels.shape[0]
 
-    def __getitem__(self, index):
-        return self.images[index], self.ocr_text_ids[index], self.caption_ids[index], self.labels[index]
+    def __getitem__(self, index: int):
+        return torch.load(self.image_paths[index]),\
+            torch.load(self.ocr_paths[index]),\
+            torch.load(self.caption_paths[index]),\
+            self.labels[index]
+
         
 def load_data(images_path, ocr_texts, captions, labels):
     r'''

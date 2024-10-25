@@ -115,8 +115,8 @@ def k_fold_cross_validation(
 
 
 if __name__ == "__main__":
-    images, ocr_text_ids, caption_ids, labels = load_data()
-    dataset = MultiMediaDataset(images, ocr_text_ids, caption_ids, labels)
+    dataset_path = "PATH TO THE PRE-PROCESSED DATASET"
+    dataset = MultiMediaDataset(dataset_path)
     batch_size = 128
     epochs = 50
     
