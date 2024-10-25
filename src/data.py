@@ -32,9 +32,9 @@ class MultiMediaDataset(Dataset):
                 if (not os.path.isdir(sample_path)):
                     continue
 
-                self.image_paths.append(os.path.join(sample_path, f"{sample_id}_image.pt"))
-                self.ocr_paths.append(os.path.join(sample_path, f"{sample_id}_ocr.pt"))
-                self.caption_paths.append(os.path.join(sample_path, f"{sample_id}_caption.pt"))
+                self.image_paths.append(os.path.join(sample_path, f"image.pt"))
+                self.ocr_paths.append(os.path.join(sample_path, f"ocr.pt"))
+                self.caption_paths.append(os.path.join(sample_path, f"caption.pt"))
                 self.labels.append(label)
             label_names.append(class_name)
 
