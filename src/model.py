@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 from transformers import (
-    AutoImageProcessor, 
     EfficientNetModel, 
     RobertaModel,
     AutoModel
@@ -102,7 +101,7 @@ def custom_forward(
         else:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
 
-        batch_size, seq_length = text_input_shape
+        batch_size, seq_length = text_input_shape[0], text_input_shape[1], 
         device = text_input_ids.device if text_input_ids is not None else inputs_embeds.device
 
         # past_key_values_length
