@@ -103,6 +103,7 @@ def get_optimizer(model, epochs, warmup_epochs, batchs):
 def download_dataset():
     trainset_path = kagglehub.dataset_download("tmaitn/uitdsc24-train-dataset")
     testset_path = kagglehub.dataset_download("longnguynvhong/dsc2024-public-test")
+    trainset_path = os.path.join(trainset_path, "uitdsc_train_dataset")
     print("Path to trainset files:", trainset_path)
     print("Path to testset files:", testset_path)
     return trainset_path, testset_path
