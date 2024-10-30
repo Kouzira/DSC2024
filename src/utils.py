@@ -36,8 +36,7 @@ def predict_on_test(
     model: MultiModalClassifier,
     testdata_dir: str,
     output_path: str,
-    device,
-    epoch = 0
+    device
 ):
     model.eval()
     model = model.to(device)

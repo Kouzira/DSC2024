@@ -85,7 +85,7 @@ if __name__ == "__main__":
     # split dataset
     dataset_path, testset_path = download_dataset()
     dataset = MultiMediaDataset(dataset_path)
-    train_dataset, val_dataset = random_split(dataset, [0.6, 0.4])
+    train_dataset, val_dataset = random_split(dataset, [0.5, 0.5])
     train_loader = DataLoader(train_dataset, batch_size, shuffle=True, num_workers=4)
     val_loader = DataLoader(val_dataset, batch_size, shuffle=False, num_workers=4)
 
@@ -118,7 +118,7 @@ if __name__ == "__main__":
             model, train_loader, optimizer, 
             lr_scheduler, scaler, loss_fn, device
         )
-        train_history.append(train_loss.item())
+        train_history.append(train_loss)
 
         # val
         val_loss = evaluate(model, val_loader, loss_fn, device)
@@ -131,4 +131,4 @@ if __name__ == "__main__":
             break
 
     result_path = "/root/DSC2024/results.json"
-    predict_on_test(model, testset_path, result_path, epoch, device)
+    predict_on_test(model, testset_path, result_path, device)
