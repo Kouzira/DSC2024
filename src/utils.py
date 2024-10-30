@@ -8,11 +8,11 @@ import kagglehub
 import py_vncorenlp
 from PIL import Image
 from transformers import (
-    AdamW,
     AutoTokenizer, 
     AutoImageProcessor,
     get_linear_schedule_with_warmup
 )
+from torch.optim import AdamW
 from model import MultiModalClassifier
 
 
@@ -35,6 +35,7 @@ OCRreader = easyocr.Reader(['vi'], gpu=True)
 def predict_on_test(
     model: MultiModalClassifier,
     testdata_dir: str,
+    output_path: str,
     device,
     epoch = 0
 ):
@@ -79,7 +80,7 @@ def predict_on_test(
         else:
             notfoundcnt += 1
             print(f"\n{image_name} not found ({notfoundcnt}).")
-    with open(f"results_{epoch}.json", 'w') as fout:
+    with open(output_path, 'w') as fout:
         json.dump(results, fout)
 
 
@@ -131,6 +132,8 @@ def load_checkpoint(checkpoint_dir, model, optimizer, lr_scheduler, history):
 
 
 def save_checkpoint(checkpoint_dir, model, optimizer, scheduler, epoch, history):
+    if not os.path.exists(checkpoint_dir):
+        os.makedirs(checkpoint_dir, exist_ok=True)
     state_dict_path = os.path.join(checkpoint_dir, "checkpoint_0.pth")
     history_path = os.path.join(checkpoint_dir, "history.json")
     checkpoint = {
@@ -142,3 +145,29 @@ def save_checkpoint(checkpoint_dir, model, optimizer, scheduler, epoch, history)
     torch.save(checkpoint, state_dict_path)
     with open(history_path, 'w') as fout:
         json.dump(history, fout)
+    print("Checkpoint saved.")
+
+
+class EarlyStopping:
+    def __init__(self, patience=5, min_delta=0.0):
+        """
+        Args:
+            patience (int): How many epochs to wait after last time the validation loss improved.
+            min_delta (float): Minimum change in the monitored quantity to qualify as an improvement.
+        """
+        self.patience = patience
+        self.min_delta = min_delta
+        self.counter = 0
+        self.best_loss = None
+        self.early_stop = False
+
+    def __call__(self, val_loss):
+        if self.best_loss is None:
+            self.best_loss = val_loss
+        elif val_loss < self.best_loss - self.min_delta:
+            self.best_loss = val_loss
+            self.counter = 0
+        else:
+            self.counter += 1
+            if self.counter >= self.patience:
+                self.early_stop = True
