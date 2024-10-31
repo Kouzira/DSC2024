@@ -46,7 +46,7 @@ def train(
         scaler.update()
         lr_scheduler.step()
 
-        print(f"{batch_count + 1}/{len(train_loader)}: loss {total_loss / (batch_count + 1)}| lr: {lr_scheduler.get_last_lr()}" + " "*40, end='\r')
+        print(f"Train: {batch_count + 1}/{len(train_loader)}: loss {total_loss / (batch_count + 1)}| lr: {lr_scheduler.get_last_lr()}" + " "*40, end='\r')
     print('')
     return total_loss / len(train_loader)
 
@@ -71,7 +71,7 @@ def evaluate(
             pred = model(batch_image, batch_ocr_text_ids, batch_caption_ids)
             batch_loss = loss_fn(pred, batch_labels)
         total_loss += batch_loss.item()
-        print(f"{batch_count + 1}/{len(val_loader)}: loss {total_loss / (batch_count + 1)}" + " "*40, end='\r')
+        print(f"Val: {batch_count + 1}/{len(val_loader)}: loss {total_loss / (batch_count + 1)}" + " "*40, end='\r')
     print('\n')
     return total_loss / len(val_loader)
 
