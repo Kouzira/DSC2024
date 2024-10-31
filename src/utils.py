@@ -8,12 +8,13 @@ import kagglehub
 import py_vncorenlp
 import matplotlib.pyplot as plt
 from PIL import Image
-from transformers import (
-    AutoTokenizer, 
-    AutoImageProcessor,
-    get_linear_schedule_with_warmup
-)
+from transformers import AutoTokenizer, AutoImageProcessor
 from torch.optim import AdamW
+from torch.optim.lr_scheduler import (
+    SequentialLR, 
+    LinearLR, 
+    ExponentialLR
+)
 from model import MultiModalClassifier
 
 
@@ -84,10 +85,8 @@ def predict_on_test(
         json.dump(results, fout)
 
 
-def get_optimizer(model, epochs, warmup_epochs, batchs):
+def get_optimizer(model, lr_for_pretrained, lr_for_untrained):
     # optimizer with different lr for pretrained and untrained modules    
-    lr_for_pretrained = 5e-5
-    lr_for_untrained = 5e-4
     weight_decay = 1e-5
     optimizer = AdamW(
         [
@@ -95,11 +94,15 @@ def get_optimizer(model, epochs, warmup_epochs, batchs):
             {"params": model.params["untrained"].parameters(), "lr": lr_for_untrained}
         ], 
         lr=lr_for_pretrained, weight_decay=weight_decay)
+    return optimizer
 
-    # lr scheduler
-    lr_scheduler = get_linear_schedule_with_warmup(optimizer, warmup_epochs * batchs, epochs * batchs)
-    return optimizer, lr_scheduler
+def get_lr_scheduler(optimizer, decay_rate, warmup_epochs, batchs):
+    warmup_steps = warmup_epochs * batchs
+    warmup_scheduler = LinearLR(optimizer, start_factor=1e-6, end_factor=1.0, total_iters=warmup_steps)
+    decay_scheduler = ExponentialLR(optimizer, gamma=decay_rate)
 
+    # combine the warm-up and decay schedulers with SequentialLR
+    return SequentialLR(optimizer, schedulers=[warmup_scheduler, decay_scheduler], milestones=[warmup_steps])
 
 def download_dataset():
     trainset_path = kagglehub.dataset_download("tmaitn/uitdsc24-train-dataset")
@@ -171,8 +174,3 @@ class EarlyStopping:
             self.counter += 1
             if self.counter >= self.patience:
                 self.early_stop = True
-
-
-def history_visualise(history):
-    plt.plot(history[0], 'train', history[1], 'val')
-    plt.show()

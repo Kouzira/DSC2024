@@ -4,14 +4,14 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
 
 from data import MultiMediaDataset
-from model import MultiModalClassifier
+from model_v2 import MultiModalClassifier
 from utils import (
     get_optimizer, 
     save_checkpoint, 
     load_checkpoint, 
     download_dataset,
     predict_on_test,
-    history_visualise,
+    get_lr_scheduler,
     EarlyStopping
 )
 
@@ -46,7 +46,7 @@ def train(
         scaler.update()
         lr_scheduler.step()
 
-        print(f"Train: {batch_count + 1}/{len(train_loader)}: loss {total_loss / (batch_count + 1)}| lr: {lr_scheduler.get_last_lr()}" + " "*40, end='\r')
+        print(f"{batch_count + 1}/{len(train_loader)}: loss {total_loss / (batch_count + 1)}| lr: {lr_scheduler.get_last_lr()}" + " "*40, end='\r')
     print('')
     return total_loss / len(train_loader)
 
@@ -70,8 +70,9 @@ def evaluate(
         with torch.no_grad():
             pred = model(batch_image, batch_ocr_text_ids, batch_caption_ids)
             batch_loss = loss_fn(pred, batch_labels)
+            
         total_loss += batch_loss.item()
-        print(f"Val: {batch_count + 1}/{len(val_loader)}: loss {total_loss / (batch_count + 1)}" + " "*40, end='\r')
+        print(f"{batch_count + 1}/{len(val_loader)}: loss {total_loss / (batch_count + 1)}" + " "*40, end='\r')
     print('\n')
     return total_loss / len(val_loader)
 
@@ -79,9 +80,9 @@ if __name__ == "__main__":
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print('Running on device: {}'.format(device))
     
-    batch_size = 19
-    epochs = 40
-    warmup_epochs = 2
+    batch_size = 20
+    epochs = 100
+    warmup_epochs = 5
 
     # split dataset
     dataset_path, testset_path = download_dataset()
@@ -91,16 +92,21 @@ if __name__ == "__main__":
     val_loader = DataLoader(val_dataset, batch_size, shuffle=False, num_workers=4)
 
     loss_fn = torch.nn.CrossEntropyLoss().to(device)
+
+    # init
+    lr_for_pretrained = 5e-6
+    lr_for_untrained = 5e-5
+    batchs = len(train_loader)
     model = MultiModalClassifier().to(device)
-    optimizer, lr_scheduler = get_optimizer(model, epochs, warmup_epochs, len(train_loader))
-
-    early_stopping = EarlyStopping(patience=5)
-
-    # mixed precision
-    scaler = torch.amp.GradScaler("cuda")
-    
-    last_epoch = -1
+    optimizer = get_optimizer(model, lr_for_pretrained, lr_for_untrained)
+    lr_scheduler = get_lr_scheduler(optimizer, 0.96, warmup_epochs, batchs)
+    early_stopping = EarlyStopping(patience=10)
+    scaler = torch.amp.GradScaler("cuda") # mixed precision
     history = [[], []]
+    last_epoch = -1
+    
+
+    # load
     loading = False
     checkpoint_dir = "/root/DSC2024/checkpoint/"
     if loading:
@@ -108,17 +114,13 @@ if __name__ == "__main__":
         print(f"Load from checkpoint. Last epoch: {len(history[0])}, last loss: {history[1][-1]}")
 
 
-    save_checkpoint(checkpoint_dir, model, optimizer, lr_scheduler, epochs, history)
     train_history = history[0]
     val_history = history[1]
     for epoch in range(last_epoch + 1, epochs):
         print(f"Epoch {epoch + 1}/{epochs}")
 
         # train
-        train_loss = train(
-            model, train_loader, optimizer, 
-            lr_scheduler, scaler, loss_fn, device
-        )
+        train_loss = train(model, train_loader, optimizer, lr_scheduler, scaler, loss_fn, device)
         train_history.append(train_loss)
 
         # val
