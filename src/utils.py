@@ -6,6 +6,7 @@ import torch
 import easyocr
 import kagglehub
 import py_vncorenlp
+import matplotlib.pyplot as plt
 from PIL import Image
 from transformers import (
     AutoTokenizer, 
@@ -170,3 +171,8 @@ class EarlyStopping:
             self.counter += 1
             if self.counter >= self.patience:
                 self.early_stop = True
+
+
+def history_visualise(history):
+    plt.plot(history[0], 'train', history[1], 'val')
+    plt.show()

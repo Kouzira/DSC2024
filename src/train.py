@@ -11,6 +11,7 @@ from utils import (
     load_checkpoint, 
     download_dataset,
     predict_on_test,
+    history_visualise,
     EarlyStopping
 )
 
