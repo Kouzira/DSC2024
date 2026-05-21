@@ -1,37 +1,76 @@
-# !pip install py_vncorenlp
-# !apt install openjdk-21-jdk openjdk-21-jre -y
+# Optional system deps (Linux):
+#   pip install py_vncorenlp
+#   apt install openjdk-21-jdk openjdk-21-jre -y
+# On Windows, install a JDK and ensure `java` is on PATH.
 import os
 import json
 import torch
-import easyocr
 import kagglehub
-import py_vncorenlp
 import matplotlib.pyplot as plt
 from PIL import Image
-from transformers import AutoTokenizer, AutoImageProcessor
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import (
-    SequentialLR, 
-    LinearLR, 
-    ExponentialLR
+    SequentialLR,
+    LinearLR,
+    ExponentialLR,
 )
 from model import MultiModalClassifier
 
 
-label_names = ["multi-sarcasm", 
-               "not-sarcasm", 
-               "image-sarcasm", 
+label_names = ["multi-sarcasm",
+               "not-sarcasm",
+               "image-sarcasm",
                "text-sarcasm"]
 
-vncorenlp_path = '/tmp/vncorenlp'
-if (not os.path.exists(vncorenlp_path)):
-    os.mkdir(vncorenlp_path)
-py_vncorenlp.download_model(save_dir=vncorenlp_path)
-rdrsegmenter = py_vncorenlp.VnCoreNLP(annotators=["wseg"], save_dir=vncorenlp_path)
 
-tokenizer = AutoTokenizer.from_pretrained("vinai/phobert-base-v2")
-image_processor = AutoImageProcessor.from_pretrained("google/efficientnet-b5")
-OCRreader = easyocr.Reader(['vi'], gpu=True)
+# ---------------------------------------------------------------------------
+# Lazy initializers for heavy / GPU-using resources.
+#
+# Putting these at module top-level caused: (1) download/load on every import,
+# (2) GPU memory allocation in every DataLoader worker, (3) Linux-only paths.
+# Now they are constructed on first use and cached.
+# ---------------------------------------------------------------------------
+
+_VNCORENLP_DIR = os.path.join(os.path.expanduser("~"), ".cache", "vncorenlp")
+
+_tokenizer = None
+_image_processor = None
+_rdrsegmenter = None
+_ocr_reader = None
+
+
+def get_tokenizer():
+    global _tokenizer
+    if _tokenizer is None:
+        from transformers import AutoTokenizer
+        _tokenizer = AutoTokenizer.from_pretrained("vinai/phobert-base-v2")
+    return _tokenizer
+
+
+def get_image_processor():
+    global _image_processor
+    if _image_processor is None:
+        from transformers import AutoImageProcessor
+        _image_processor = AutoImageProcessor.from_pretrained("google/efficientnet-b5")
+    return _image_processor
+
+
+def get_segmenter():
+    global _rdrsegmenter
+    if _rdrsegmenter is None:
+        import py_vncorenlp
+        os.makedirs(_VNCORENLP_DIR, exist_ok=True)
+        py_vncorenlp.download_model(save_dir=_VNCORENLP_DIR)
+        _rdrsegmenter = py_vncorenlp.VnCoreNLP(annotators=["wseg"], save_dir=_VNCORENLP_DIR)
+    return _rdrsegmenter
+
+
+def get_ocr_reader(gpu=True):
+    global _ocr_reader
+    if _ocr_reader is None:
+        import easyocr
+        _ocr_reader = easyocr.Reader(["vi"], gpu=gpu)
+    return _ocr_reader
 
 
 def predict_on_test(
@@ -43,8 +82,13 @@ def predict_on_test(
     model.eval()
     model = model.to(device)
 
-    json_input_path = f"{testdata_dir}/vimmsd-public-test.json"
-    image_input_folder = f"{testdata_dir}/public-test-images/dev-images"
+    image_processor = get_image_processor()
+    tokenizer = get_tokenizer()
+    rdrsegmenter = get_segmenter()
+    OCRreader = get_ocr_reader(gpu=(device.type == "cuda"))
+
+    json_input_path = os.path.join(testdata_dir, "vimmsd-public-test.json")
+    image_input_folder = os.path.join(testdata_dir, "public-test-images", "dev-images")
 
     with open(json_input_path, 'r', encoding='utf-8') as f:
         data = json.load(f)

@@ -1,4 +1,5 @@
 import json
+import os
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
@@ -108,7 +109,7 @@ if __name__ == "__main__":
 
     # load
     loading = False
-    checkpoint_dir = "/root/DSC2024/checkpoint/"
+    checkpoint_dir = os.path.join(os.path.expanduser("~"), "DSC2024", "checkpoint")
     if loading:
         last_epoch = load_checkpoint(checkpoint_dir, model, optimizer, lr_scheduler, history)
         print(f"Load from checkpoint. Last epoch: {last_epoch}, last val loss: {history[1][-1]}")
@@ -133,5 +134,6 @@ if __name__ == "__main__":
         if early_stopping.early_stop:
             break
 
-    result_path = "/root/DSC2024/results.json"
+    result_path = os.path.join(os.path.expanduser("~"), "DSC2024", "results.json")
+    os.makedirs(os.path.dirname(result_path), exist_ok=True)
     predict_on_test(model, testset_path, result_path, device)
