@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+venv/
+env/
+.venv/
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Project artifacts
+checkpoint/
+checkpoints/
+*.pth
+*.pt
+!src/**/*.pt  # keep tracked feature tensors if any
+results.json
+history.json
+
+# Datasets and large binaries
+*.zip
+warmup-images/
+public-test-images/
+dev-images/
+
+# Logs and plots
+logs/
+runs/
+wandb/
+*.log
+plots/
+figures/
+
+# OS / temp
+nul
+tmp/
+/tmp/

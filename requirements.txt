@@ -1,0 +1,25 @@
+# Core deep learning
+torch>=2.1.0
+torchvision>=0.16.0
+
+# HuggingFace
+transformers>=4.40.0
+tokenizers>=0.15.0
+
+# Vietnamese NLP
+py_vncorenlp>=0.1.4
+
+# Image / OCR
+Pillow>=10.0.0
+easyocr>=1.7.0
+
+# Data / utilities
+numpy>=1.24.0
+scikit-learn>=1.3.0
+matplotlib>=3.7.0
+
+# Dataset hub
+kagglehub>=0.2.0
+
+# Optional: progress bar / experiment tracking
+tqdm>=4.65.0
