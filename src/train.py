@@ -110,8 +110,8 @@ if __name__ == "__main__":
     loading = False
     checkpoint_dir = "/root/DSC2024/checkpoint/"
     if loading:
-        load_checkpoint(checkpoint_dir, model, optimizer, lr_scheduler, history)
-        print(f"Load from checkpoint. Last epoch: {len(history[0])}, last loss: {history[1][-1]}")
+        last_epoch = load_checkpoint(checkpoint_dir, model, optimizer, lr_scheduler, history)
+        print(f"Load from checkpoint. Last epoch: {last_epoch}, last val loss: {history[1][-1]}")
 
 
     train_history = history[0]

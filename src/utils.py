@@ -119,20 +119,27 @@ def load_model(path, model):
     model.load_state_dict(checkpoint["model_state_dict"])
 
 
-def load_checkpoint(checkpoint_dir, model, optimizer, lr_scheduler, history):   
+def load_checkpoint(checkpoint_dir, model, optimizer, lr_scheduler, history):
+    """Restore model + optimizer + scheduler + history from disk.
+
+    Returns the last completed epoch index (int), so training can resume from epoch+1.
+    """
     state_dict_path = os.path.join(checkpoint_dir, "checkpoint_0.pth")
-    history_path = os.path.join(checkpoint_dir, "history.json") 
+    history_path = os.path.join(checkpoint_dir, "history.json")
 
     checkpoint = torch.load(state_dict_path)
     model.load_state_dict(checkpoint["model_state_dict"])
     optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
     lr_scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
-    
+    last_epoch = checkpoint.get("epoch", -1)
+
     if (os.path.exists(history_path)):
         with open(history_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
             history[0] = data[0]
             history[1] = data[1]
+
+    return last_epoch
 
 
 def save_checkpoint(checkpoint_dir, model, optimizer, scheduler, epoch, history):
