@@ -50,7 +50,8 @@ def predict_on_test(
         data = json.load(f)
 
     results = {"results": {}, "phase": "dev"}
-    
+    notfoundcnt = 0
+
     for sample_cnt, (key, value) in enumerate(data.items()):
         image_name = value['image']
         image_path = os.path.join(image_input_folder, image_name)
@@ -71,7 +72,7 @@ def predict_on_test(
 
             image_tensor = image_tensor.to(device)
             ocr_ids = ocr_ids.to(device)
-            caption_ids = ocr_ids.to(device)
+            caption_ids = caption_ids.to(device)
             with torch.no_grad():
                 pred = model(image_tensor, ocr_ids, caption_ids)
                 pred_label = torch.argmax(pred, dim=1).item()
