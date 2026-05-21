@@ -101,17 +101,33 @@ def custom_forward(
         else:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
 
-        batch_size, seq_length = text_input_shape[0], text_input_shape[1], 
+        batch_size, seq_length = text_input_shape[0], text_input_shape[1]
         device = text_input_ids.device if text_input_ids is not None else inputs_embeds.device
 
         # past_key_values_length
         past_key_values_length = past_key_values[0][0].shape[2] if past_key_values is not None else 0
 
+        # === Build attention mask correctly ===
+        # If the caller passed a text-only attention mask, use it. Otherwise derive it
+        # from pad token positions in text_input_ids — CRITICAL so padding tokens are not
+        # attended to as real tokens. Image features (prefix) are always attended (mask=1).
         if attention_mask is None:
-            attention_mask = torch.ones(((batch_size, seq_length + additional_feature_input.size()[1] + past_key_values_length)), device=device)
-        
-#         print("att_mask:", attention_mask.shape)
-        
+            pad_token_id = getattr(self.config, "pad_token_id", None)
+            if pad_token_id is not None and text_input_ids is not None:
+                attention_mask = (text_input_ids != pad_token_id).long()
+            else:
+                attention_mask = torch.ones(text_input_shape, dtype=torch.long, device=device)
+
+        additional_feature_length = additional_feature_input.size(1)
+        image_feature_mask = torch.ones(
+            (batch_size, additional_feature_length),
+            dtype=attention_mask.dtype,
+            device=device,
+        )
+        # Concat order MUST match the embedding concat below: [image_features, text_embeddings].
+        full_attention_mask = torch.cat([image_feature_mask, attention_mask], dim=1)
+        full_seq_length = full_attention_mask.size(1)
+
         if token_type_ids is None:
             if hasattr(self.embeddings, "token_type_ids"):
                 buffered_token_type_ids = self.embeddings.token_type_ids[:, :seq_length]
@@ -120,9 +136,11 @@ def custom_forward(
             else:
                 token_type_ids = torch.zeros(text_input_shape, dtype=torch.long, device=device)
 
-        # We can provide a self-attention mask of dimensions [batch_size, from_seq_length, to_seq_length]
-        # ourselves in which case we just need to make it broadcastable to all heads.
-        extended_attention_mask: torch.Tensor = self.get_extended_attention_mask(attention_mask, text_input_shape)
+        # Use the FULL sequence shape (image prefix + text) for the extended mask so that
+        # self-attention correctly ignores padding tokens at all layers.
+        extended_attention_mask: torch.Tensor = self.get_extended_attention_mask(
+            full_attention_mask, (batch_size, full_seq_length)
+        )
 
 #         print("extended_att_mask:", extended_attention_mask.shape)
             
