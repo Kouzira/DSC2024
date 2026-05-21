@@ -130,6 +130,49 @@ def predict_on_test(
         json.dump(results, fout)
 
 
+def compute_metrics(y_true, y_pred):
+    """Compute classification metrics for the 4-class sarcasm task.
+
+    Args:
+        y_true: 1-D iterable of integer labels.
+        y_pred: 1-D iterable of integer predictions.
+
+    Returns:
+        dict with keys: accuracy, f1_macro, f1_per_class (list, len=4),
+        precision_per_class, recall_per_class, confusion_matrix (list of list).
+    """
+    from sklearn.metrics import (
+        accuracy_score,
+        f1_score,
+        precision_score,
+        recall_score,
+        confusion_matrix,
+    )
+
+    labels = list(range(len(label_names)))  # [0, 1, 2, 3]
+    return {
+        "accuracy": float(accuracy_score(y_true, y_pred)),
+        "f1_macro": float(f1_score(y_true, y_pred, labels=labels, average="macro", zero_division=0)),
+        "f1_per_class": f1_score(y_true, y_pred, labels=labels, average=None, zero_division=0).tolist(),
+        "precision_per_class": precision_score(y_true, y_pred, labels=labels, average=None, zero_division=0).tolist(),
+        "recall_per_class": recall_score(y_true, y_pred, labels=labels, average=None, zero_division=0).tolist(),
+        "confusion_matrix": confusion_matrix(y_true, y_pred, labels=labels).tolist(),
+        "label_names": label_names,
+    }
+
+
+def format_metrics(metrics: dict) -> str:
+    """Pretty-print metrics for logging."""
+    lines = [
+        f"  accuracy : {metrics['accuracy']:.4f}",
+        f"  f1_macro : {metrics['f1_macro']:.4f}",
+        "  per-class F1:",
+    ]
+    for name, f1 in zip(metrics["label_names"], metrics["f1_per_class"]):
+        lines.append(f"    {name:<14s}: {f1:.4f}")
+    return "\n".join(lines)
+
+
 def get_optimizer(model, lr_for_pretrained, lr_for_untrained):
     # optimizer with different lr for pretrained and untrained modules    
     weight_decay = 1e-5
@@ -186,7 +229,14 @@ def load_checkpoint(checkpoint_dir, model, optimizer, lr_scheduler, history):
     return last_epoch
 
 
-def save_checkpoint(checkpoint_dir, model, optimizer, scheduler, epoch, history):
+def save_checkpoint(checkpoint_dir, model, optimizer, scheduler, epoch, history, metrics_history=None):
+    """Save model + training state + history.
+
+    Args:
+        history: [train_loss_list, val_loss_list] (legacy list-of-lists format).
+        metrics_history: optional list of per-epoch metrics dicts (from compute_metrics).
+            When provided, written to <checkpoint_dir>/metrics.json.
+    """
     if not os.path.exists(checkpoint_dir):
         os.makedirs(checkpoint_dir, exist_ok=True)
     state_dict_path = os.path.join(checkpoint_dir, "checkpoint_0.pth")
@@ -200,7 +250,24 @@ def save_checkpoint(checkpoint_dir, model, optimizer, scheduler, epoch, history)
     torch.save(checkpoint, state_dict_path)
     with open(history_path, 'w') as fout:
         json.dump(history, fout)
+    if metrics_history is not None:
+        metrics_path = os.path.join(checkpoint_dir, "metrics.json")
+        with open(metrics_path, 'w') as fout:
+            json.dump(metrics_history, fout, indent=2)
     print("Checkpoint saved.")
+
+
+def save_best_checkpoint(checkpoint_dir, model, epoch, metrics):
+    """Save a separate copy of the best model so far (by macro F1)."""
+    if not os.path.exists(checkpoint_dir):
+        os.makedirs(checkpoint_dir, exist_ok=True)
+    path = os.path.join(checkpoint_dir, "best_model.pth")
+    torch.save({
+        'model_state_dict': model.state_dict(),
+        'epoch': epoch,
+        'metrics': metrics,
+    }, path)
+    print(f"Best model saved at epoch {epoch} (f1_macro={metrics['f1_macro']:.4f}).")
 
 
 class EarlyStopping:
