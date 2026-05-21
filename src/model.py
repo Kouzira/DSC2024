@@ -210,16 +210,13 @@ class MultiModalClassifier(nn.Module):
         self.image_feature_extractor = ImageFeatureExtractor()
 
         self.bridge_layer_1 = nn.Linear(2048, 768)
-
         self.modified_phobert_1 = ModifiedPhoBERT()
-
         self.pool_1 = nn.AvgPool1d(4, 4)
-        self.bridge_layer_2 = nn.Linear(768, 768)
 
+        self.bridge_layer_2 = nn.Linear(768, 768)
         self.modified_phobert_2 = ModifiedPhoBERT()
 
         self.fc1 = nn.Linear(2 * 768, 256)
-        self.gelu = nn.GELU()
         self.dropout = nn.Dropout(0.5)
         self.fc2 = nn.Linear(256, 4)
         self.softmax = nn.Softmax(dim=1)
@@ -247,6 +244,7 @@ class MultiModalClassifier(nn.Module):
     ) -> torch.Tensor:
         image_feature = self.image_feature_extractor(image_tensor)
         image_feature = self.bridge_layer_1(image_feature)
+        image_feature = nn.functional.gelu(image_feature)
 
         # phobert1
         phobert_1_output = self.modified_phobert_1(ocr_text_ids, image_feature)
@@ -255,13 +253,14 @@ class MultiModalClassifier(nn.Module):
         # avg pool to size (_, n/4, _)
         phobert_1_feature = self.pool_1(last_hidden_state_1.permute(0, 2, 1)).permute(0, 2, 1)
         phobert_1_feature = self.bridge_layer_2(phobert_1_feature)
+        phobert_1_feature = nn.functional.gelu(phobert_1_feature)
 
         # phobert2
         phobert_2_output = self.modified_phobert_2(caption_text_ids, phobert_1_feature)
-
+        
         all_feature = torch.cat((phobert_1_output.pooler_output, phobert_2_output.pooler_output), dim=1)
         x = self.fc1(all_feature)
-        x = self.gelu(x)
+        x = nn.functional.gelu(x)
         x = self.dropout(x)
         x = self.fc2(x)
         x = self.softmax(x)

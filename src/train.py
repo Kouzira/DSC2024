@@ -4,7 +4,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
 
 from data import MultiMediaDataset
-from model_v2 import MultiModalClassifier
+from model import MultiModalClassifier
 from utils import (
     get_optimizer, 
     save_checkpoint, 
