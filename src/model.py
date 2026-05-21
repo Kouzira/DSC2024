@@ -219,7 +219,9 @@ class MultiModalClassifier(nn.Module):
         self.fc1 = nn.Linear(2 * 768, 256)
         self.dropout = nn.Dropout(0.5)
         self.fc2 = nn.Linear(256, 4)
-        self.softmax = nn.Softmax(dim=1)
+        # NOTE: Softmax intentionally NOT applied here. CrossEntropyLoss expects raw logits
+        # (it applies log_softmax internally). Apply softmax only at inference if you need
+        # probabilities — see predict_on_test in utils.py.
 
         self.params = nn.ModuleDict({
             'pretrained': nn.ModuleList(
@@ -262,6 +264,5 @@ class MultiModalClassifier(nn.Module):
         x = self.fc1(all_feature)
         x = nn.functional.gelu(x)
         x = self.dropout(x)
-        x = self.fc2(x)
-        x = self.softmax(x)
-        return x
+        logits = self.fc2(x)
+        return logits
